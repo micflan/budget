@@ -1,0 +1,20 @@
+{
+    "name": "micflan/budget",
+    "description": "A simple personal budget calculator",
+    "type": "library",
+    "require-dev": {
+        "phpunit/phpunit": "^5.4"
+    },
+    "authors": [
+        {
+            "name": "Michael Flanagan",
+            "email": "michael@flanagan.ie"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Trixworks\\Budget\\": "src/"
+        }
+    },
+    "require": {}
+}
