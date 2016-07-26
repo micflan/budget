@@ -1,5 +1,5 @@
 {
-    "name": "micflan/budget",
+    "name": "trixworks/budget",
     "description": "A simple personal budget calculator",
     "type": "library",
     "require-dev": {
