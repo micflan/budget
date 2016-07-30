@@ -10,6 +10,8 @@ class Expense
 
     private $date;
 
+    private $isNew;
+
     /**
      * Expense constructor.
      * @param float $value
@@ -17,8 +19,9 @@ class Expense
      */
     public function __construct(float $value, DateTime $date = null)
     {
-        $this->value = $value;
+        $this->value = round($value, 2);
         $this->date = $date ?: new DateTime();
+        $this->isNew = true;
     }
 
     /**
@@ -35,5 +38,17 @@ class Expense
     public function value() : float
     {
         return $this->value;
+    }
+
+    public function isNew()
+    {
+        return $this->isNew;
+    }
+
+    public function process()
+    {
+        $this->isNew = false;
+
+        return $this;
     }
 }

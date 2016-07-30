@@ -23,7 +23,7 @@ class BudgetTest extends PHPUnit_Framework_TestCase
     {
         $budget = $this->createBudget(650);
 
-        $this->assertEquals(650, $budget->savings());
+        $this->assertEquals(650, $budget->remainingCash());
     }
 
     public function testCanSpendCashAndSeeSavings()
@@ -32,38 +32,37 @@ class BudgetTest extends PHPUnit_Framework_TestCase
 
         $budget->spend(75);
 
-        $this->assertEquals(650 - 75, $budget->savings());
+        $this->assertEquals(650 - 75, $budget->remainingCash());
 
         $budget->spend(123);
 
-        $this->assertEquals(650 - 75 - 123, $budget->savings());
+        $this->assertEquals(650 - 75 - 123, $budget->remainingCash());
     }
 
     public function testCanSeeSavingsForSpecificDate()
     {
         $budget = $this->createBudget(650);
 
-        $budget->spendOnDate(new DateTime('-3 days'), 75);
+        $budget->spend(75, new DateTime('-3 days'));
 
-        $budget->spendOnDate(new DateTime('yesterday'), 123);
+        $budget->spend(123, new DateTime('yesterday'));
 
-        $this->assertEquals(650 - 75, $budget->savingsOnDate(new DateTime('-3 days')));
+        $this->assertEquals(650 - 75, $budget->remainingCash(new DateTime('-3 days')));
 
-        $this->assertEquals(650 - 75 - 123, $budget->savings());
+        $this->assertEquals(650 - 75 - 123, $budget->remainingCash());
     }
 
     public function testCanSpecifyExpenseDate()
     {
-        /** @var Budget $budget */
         $budget = $this->createBudget(650);
 
-        $budget->spendOnDate(new DateTime('-3 days'), 75);
+        $budget->spend(75, new DateTime('-3 days'));
 
-        $this->assertEquals(650 - 75, $budget->savings());
+        $this->assertEquals(650 - 75, $budget->remainingCash());
 
-        $budget->spendOnDate(new DateTime('yesterday'), 123);
+        $budget->spend(123, new DateTime('yesterday'));
 
-        $this->assertEquals(650 - 75 - 123, $budget->savings());
+        $this->assertEquals(650 - 75 - 123, $budget->remainingCash());
     }
 
     public function testCanNotSpendOutsideDateRange()
@@ -72,7 +71,7 @@ class BudgetTest extends PHPUnit_Framework_TestCase
 
         $this->setExpectedException(DateException::class);
 
-        $budget->spendOnDate(new DateTime('-50 days'), 75);
+        $budget->spend(75, new DateTime('-50 days'));
     }
 
     public function testCanSeeTotalDaysInBudget()
@@ -130,5 +129,37 @@ class BudgetTest extends PHPUnit_Framework_TestCase
 
         $budget = $this->createBudget(100);
         $this->assertEquals($endDate, $budget->endDate());
+    }
+
+    public function testReturnsUniqueKey()
+    {
+        $key1 = $this->createBudget(100)->getKey();
+        $key2 = $this->createBudget(100)->getKey();
+
+        $this->assertGreaterThan(10, strlen($key1));
+        $this->assertGreaterThan(10, strlen($key2));
+
+        $this->assertNotEquals($key1, $key2);
+    }
+
+    public function testCanBulkProcessExpenses()
+    {
+        $budget = $this->createBudget(650);
+
+        $budget->spend(75, new DateTime('-3 days'));
+        $budget->spend(123, new DateTime('yesterday'));
+        $budget->spend(50, new DateTime('tomorrow'));
+
+        foreach ($budget->expenses() as $expense)
+        {
+            $this->assertTrue($expense->isNew());
+        }
+
+        $budget->process();
+
+        foreach ($budget->expenses() as $expense)
+        {
+            $this->assertFalse($expense->isNew());
+        }
     }
 }

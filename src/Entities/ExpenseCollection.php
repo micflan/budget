@@ -10,10 +10,11 @@ class ExpenseCollection
 
     /**
      * ExpenseCollection constructor.
+     * @param array $expenses
      */
-    public function __construct()
+    public function __construct(array $expenses = null)
     {
-        $this->expenses = [];
+        $this->expenses = $expenses ?: [];
     }
 
     /**
@@ -25,13 +26,27 @@ class ExpenseCollection
     }
 
     /**
+     * @param DateTime $date
+     * @return array
+     */
+    public function fromDate(DateTime $date) : array
+    {
+        $date->setTime( 0, 0, 0 );
+
+        return array_filter($this->expenses, function(Expense $expense) use ($date) {
+            $diff = $date->diff( $expense->date()->setTime( 0, 0, 0 ) );
+            return $diff->days === 0;
+        });
+    }
+
+    /**
      * @return float
      */
-    public function total() : float
+    public function totalSpent() : float
     {
-        return $this->expenses->sum(function ($expense) {
-            return $expense->value();
-        });
+        return array_reduce($this->expenses, function ($result, $item) {
+            return $result += $item->value();
+        }, 0);
     }
 
     /**

@@ -13,6 +13,8 @@ class Budget
 
     private $expenses;
 
+    private $key;
+
     /**
      * Budget constructor.
      * @param DateRange $dateRange
@@ -21,7 +23,7 @@ class Budget
     public function __construct(DateRange $dateRange, float $cash)
     {
         $this->dateRange = $dateRange;
-        $this->cash = $cash;
+        $this->cash = round($cash, 2);
         $this->expenses = new ExpenseCollection;
     }
 
@@ -33,20 +35,10 @@ class Budget
      */
     public function spend(float $cash, DateTime $date = null) : self
     {
-        $this->expenses->add(new Expense($cash, $this->validDate($date ?: new DateTime())));
+        $date = $this->validDate($date ?: new DateTime());
+        $this->expenses->add(new Expense($cash, $date));
 
         return $this;
-    }
-
-    /**
-     * @param DateTime $date
-     * @param float $cash
-     * @return Budget
-     * @throws DateException
-     */
-    public function spendOnDate(DateTime $date, float $cash) : self
-    {
-        return $this->spend($cash, $date);
     }
 
     /**
@@ -55,16 +47,45 @@ class Budget
      */
     public function savings(DateTime $date = null) : float
     {
-        return $this->cash - $this->expenses->spentUntilDate($this->validDate($date ?: new DateTime()));
+        $date = $this->validDate($date ?: new DateTime());
+        $cash = $this->cash - $this->dailyCash() * ($this->remainingDays()-1);
+        $savings = $cash - $this->expenses->spentUntilDate($date);
+
+        return $savings;
+    }
+
+    /**
+     * @return Expense[]
+     */
+    public function allExpenses() : array
+    {
+        return $this->expenses->all();
+    }
+
+    /**
+     * @param DateTime $date
+     * @return Expense[]
+     */
+    public function expenses(DateTime $date = null) : array
+    {
+        $date = $this->validDate($date ?: new DateTime());
+        return $this->expenses->fromDate($date);
     }
 
     /**
      * @param DateTime $date
      * @return float
      */
-    public function savingsOnDate(DateTime $date) : float
+    public function spent(DateTime $date = null) : float
     {
-        return $this->cash - $this->expenses->spentUntilDate($date);
+        $date = $this->validDate($date ?: new DateTime());
+        if (! $expenses = $this->expenses->fromDate($date)) {
+            return 0;
+        }
+
+        $expenses = new ExpenseCollection($expenses);
+
+        return $expenses->totalSpent();
     }
 
     /**
@@ -80,7 +101,7 @@ class Budget
      */
     public function dailyCash() : float
     {
-        return $this->cash / $this->dateRange->days();
+        return round($this->cash / $this->dateRange->days(), 2);
     }
 
     /**
@@ -89,7 +110,10 @@ class Budget
      */
     public function remainingCash(DateTime $date = null) : float
     {
-        return $this->startingCash() - $this->expenses->spentUntilDate($this->validDate($date ?: new DateTime()));
+        $date = $this->validDate($date ?: new DateTime());
+        $cash = $this->startingCash() - $this->expenses->spentUntilDate($date);
+
+        return $cash;
     }
 
     /**
@@ -98,7 +122,10 @@ class Budget
      */
     public function remainingBudget(DateTime $date = null) : float
     {
-        return $this->dailyCash() - $this->expenses->spentOnDate($this->validDate($date ?: new DateTime()));
+        $date = $this->validDate($date ?: new DateTime());
+        $budget = $this->dailyCash() - $this->expenses->spentOnDate($date);
+
+        return $budget;
     }
 
     /**
@@ -147,5 +174,40 @@ class Budget
     public function endDate() : DateTime
     {
         return $this->dateRange->end();
+    }
+
+    /**
+     * @param string $key
+     * @return Budget
+     */
+    public function setKey(string $key) : self
+    {
+        $this->key = $key;
+
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getKey() : string
+    {
+        return $this->key = $this->key ?: uniqid();
+    }
+
+    /**
+     * @return Budget
+     */
+    public function process() : self
+    {
+        $expenses = [];
+
+        foreach ($this->expenses() as $expense) {
+            $expenses[] = $expense->process();
+        }
+
+        $this->expenses = new ExpenseCollection($expenses);
+
+        return $this;
     }
 }
