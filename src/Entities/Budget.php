@@ -202,7 +202,7 @@ class Budget
     {
         $expenses = [];
 
-        foreach ($this->expenses() as $expense) {
+        foreach ($this->allExpenses() as $expense) {
             $expenses[] = $expense->process();
         }
 
