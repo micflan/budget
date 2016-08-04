@@ -48,6 +48,6 @@ class DateRange
 
     public function days()
     {
-        return $this->start()->diff($this->end())->days;
+        return $this->start()->diff($this->end())->days + 1;
     }
 }

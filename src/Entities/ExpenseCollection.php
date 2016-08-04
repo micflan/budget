@@ -26,17 +26,30 @@ class ExpenseCollection
     }
 
     /**
-     * @param DateTime $date
-     * @return array
+     * @param Expense $expense
+     * @return ExpenseCollection
      */
-    public function fromDate(DateTime $date) : array
+    public function add(Expense $expense) : self
+    {
+        $this->expenses[] = $expense;
+
+        return $this;
+    }
+
+    /**
+     * @param DateTime $date
+     * @return ExpenseCollection
+     */
+    public function onDate(DateTime $date) : self
     {
         $date->setTime( 0, 0, 0 );
 
-        return array_filter($this->expenses, function(Expense $expense) use ($date) {
+        $expenses = array_filter($this->expenses, function(Expense $expense) use ($date) {
             $diff = $date->diff( $expense->date()->setTime( 0, 0, 0 ) );
             return $diff->days === 0;
         });
+
+        return new static($expenses);
     }
 
     /**
@@ -47,17 +60,6 @@ class ExpenseCollection
         return array_reduce($this->expenses, function ($result, $item) {
             return $result += $item->value();
         }, 0);
-    }
-
-    /**
-     * @param Expense $expense
-     * @return ExpenseCollection
-     */
-    public function add(Expense $expense) : self
-    {
-        $this->expenses[] = $expense;
-
-        return $this;
     }
 
     /**

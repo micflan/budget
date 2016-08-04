@@ -8,10 +8,12 @@ class BudgetTest extends PHPUnit_Framework_TestCase
 {
     /**
      * @param $cash
+     * @param string $start
+     * @param string $end
      * @return Budget
      */
-    private function createBudget($cash) {
-        $dateRange = new DateRange(new DateTime('-15 days'), new DateTime('+15 days'));
+    private function createBudget($cash, $start = '-14 days', $end = '+15 days') {
+        $dateRange = new DateRange(new DateTime($start), new DateTime($end));
 
         /** @var Budget $budget */
         $budget = new Budget($dateRange, $cash);
@@ -83,7 +85,13 @@ class BudgetTest extends PHPUnit_Framework_TestCase
     public function testCanSeeRemainingDaysInBudget()
     {
         $budget = $this->createBudget(100);
-        $this->assertEquals(15, $budget->remainingDays());
+        $this->assertEquals(16, $budget->remainingDays());
+    }
+
+    public function testCanSeeElapsedDaysInBudget()
+    {
+        $budget = $this->createBudget(100);
+        $this->assertEquals(14, $budget->elapsedDays());
     }
 
     public function testCanSeeTotalCashInBudget()
@@ -103,7 +111,7 @@ class BudgetTest extends PHPUnit_Framework_TestCase
     public function testCanSeeDailyBudgetAmount()
     {
         $budget = $this->createBudget(10*30);
-        $this->assertEquals(10, $budget->dailyCash());
+        $this->assertEquals(10, $budget->dailyBudget());
     }
 
     public function testCanSeeTodaysRemainingBudget()
@@ -115,7 +123,7 @@ class BudgetTest extends PHPUnit_Framework_TestCase
 
     public function testCanSeeBudgetStartDate()
     {
-        $startDate = new DateTime('-15 days');
+        $startDate = new DateTime('-14 days');
         $startDate->setTime(0,0,0);
 
         $budget = $this->createBudget(100);
@@ -146,9 +154,11 @@ class BudgetTest extends PHPUnit_Framework_TestCase
     {
         $budget = $this->createBudget(650);
 
-        $budget->spend(75, new DateTime('-3 days'));
-        $budget->spend(123, new DateTime('yesterday'));
+        $budget->spend(50, new DateTime('-3 days'));
+        $budget->spend(50, new DateTime('yesterday'));
         $budget->spend(50, new DateTime('tomorrow'));
+
+        $this->assertEquals(500, $budget->remainingCash());
 
         foreach ($budget->expenses() as $expense)
         {
@@ -157,9 +167,38 @@ class BudgetTest extends PHPUnit_Framework_TestCase
 
         $budget->process();
 
+        $this->assertEquals(500, $budget->remainingCash());
+
         foreach ($budget->expenses() as $expense)
         {
             $this->assertFalse($expense->isNew());
         }
+    }
+
+    public function testCanRecalculateBudget()
+    {
+        $budget = $this->createBudget(300, 'today', '+30 days');
+
+        $this->assertEquals(10, round($budget->dailyBudget()));
+        $budget->spend(150);
+        $this->assertEquals(10, round($budget->dailyBudget()));
+        $budget->recalculate();
+        $this->assertEquals(5, round($budget->dailyBudget()));
+        $this->assertEquals(5, round($budget->savings()));
+
+
+        $budget = $this->createBudget(300);
+        $this->assertEquals(10, $budget->dailyBudget());
+
+        for ($i=-14; $i <= 0; $i++) {
+            $budget->spend(15, new DateTime("$i days"));
+        }
+        $this->assertEquals(10, $budget->dailyBudget());
+        $this->assertEquals(225, $budget->expenses()->totalSpent());
+        $budget->recalculate();
+        $this->assertEquals($budget->totalDays(), $budget->remainingDays());
+        $this->assertEquals(5, round($budget->dailyBudget()));
+        $this->assertEquals(5, round($budget->savings()));
+        $this->assertCount(0, $budget->expenses()->all());
     }
 }

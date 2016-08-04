@@ -4,6 +4,7 @@ namespace Trixworks\Budget\Entities;
 
 use DateTime;
 use Trixworks\Budget\Exceptions\Date as DateException;
+use Trixworks\Budget\Exceptions\Date;
 
 class Budget
 {
@@ -42,34 +43,26 @@ class Budget
     }
 
     /**
-     * @param DateTime $date
      * @return float
      */
-    public function savings(DateTime $date = null) : float
+    public function savings() : float
     {
-        $date = $this->validDate($date ?: new DateTime());
-        $cash = $this->cash - $this->dailyCash() * ($this->remainingDays()-1);
-        $savings = $cash - $this->expenses->spentUntilDate($date);
+        $cash = $this->cash - $this->dailyBudget() * ($this->remainingDays() - 1);
 
-        return $savings;
+        return $cash - $this->expenses->spentUntilDate(new DateTime());
     }
 
     /**
-     * @return Expense[]
+     * @param string|DateTime $date
+     * @return ExpenseCollection
      */
-    public function allExpenses() : array
+    public function expenses($date = null) : ExpenseCollection
     {
-        return $this->expenses->all();
-    }
-
-    /**
-     * @param DateTime $date
-     * @return Expense[]
-     */
-    public function expenses(DateTime $date = null) : array
-    {
-        $date = $this->validDate($date ?: new DateTime());
-        return $this->expenses->fromDate($date);
+        if ($date) {
+            return $this->expenses->onDate($this->validDate($date ?: new DateTime()));
+        } else {
+            return $this->expenses;
+        }
     }
 
     /**
@@ -79,11 +72,9 @@ class Budget
     public function spent(DateTime $date = null) : float
     {
         $date = $this->validDate($date ?: new DateTime());
-        if (! $expenses = $this->expenses->fromDate($date)) {
+        if (! $expenses = $this->expenses->onDate($date)) {
             return 0;
         }
-
-        $expenses = new ExpenseCollection($expenses);
 
         return $expenses->totalSpent();
     }
@@ -99,7 +90,7 @@ class Budget
     /**
      * @return float
      */
-    public function dailyCash() : float
+    public function dailyBudget() : float
     {
         return round($this->cash / $this->dateRange->days(), 2);
     }
@@ -110,10 +101,13 @@ class Budget
      */
     public function remainingCash(DateTime $date = null) : float
     {
-        $date = $this->validDate($date ?: new DateTime());
-        $cash = $this->startingCash() - $this->expenses->spentUntilDate($date);
+        if ($date) {
+            $spent = $this->expenses->spentUntilDate($date);
+        } else {
+            $spent = $this->expenses->totalSpent();
+        }
 
-        return $cash;
+        return $this->startingCash() - $spent;
     }
 
     /**
@@ -123,7 +117,7 @@ class Budget
     public function remainingBudget(DateTime $date = null) : float
     {
         $date = $this->validDate($date ?: new DateTime());
-        $budget = $this->dailyCash() - $this->expenses->spentOnDate($date);
+        $budget = $this->dailyBudget() - $this->expenses->spentOnDate($date);
 
         return $budget;
     }
@@ -142,22 +136,16 @@ class Budget
     public function remainingDays() : int
     {
         $today = new DateTime();
-        return $today->diff($this->dateRange->end())->days;
+        return $today->diff($this->dateRange->end())->days + 1;
 
     }
 
     /**
-     * @param DateTime $date
-     * @return DateTime
-     * @throws DateException
+     * @return int
      */
-    private function validDate(DateTime $date) : DateTime
+    public function elapsedDays() : int
     {
-        if (! $this->dateRange->containsDate($date)) {
-            throw new DateException('Date is out of range');
-        }
-
-        return $date;
+        return $this->dateRange->start()->diff(new DateTime())->days;
     }
 
     /**
@@ -202,12 +190,52 @@ class Budget
     {
         $expenses = [];
 
-        foreach ($this->allExpenses() as $expense) {
+        foreach ($this->expenses->all() as $expense) {
             $expenses[] = $expense->process();
         }
 
         $this->expenses = new ExpenseCollection($expenses);
 
         return $this;
+    }
+
+    /**
+     * @return Budget
+     */
+    public function recalculate() : self
+    {
+        $savings = $this->savings();
+
+        // Remove daily budget for past days from total cash
+        $this->cash = $this->cash - ($this->dailyBudget() * $this->elapsedDays());
+
+        // Add any savings accumulated
+        $this->cash += $savings;
+
+        // Reset date range
+        $this->dateRange = new DateRange(new DateTime(), $this->dateRange->end());
+
+        // Reset expenses collection
+        $this->expenses = new ExpenseCollection();
+
+        return $this;
+    }
+
+    /**
+     * @param string|DateTime $date
+     * @return DateTime
+     * @throws DateException
+     */
+    private function validDate($date) : DateTime
+    {
+        if (! $date instanceof DateTime and ! $date = new DateTime($date)) {
+            throw new DateException('Invalid date string or DateTime object');
+        }
+
+        if (! $this->dateRange->containsDate($date)) {
+            throw new DateException('Date is out of range');
+        }
+
+        return $date;
     }
 }
